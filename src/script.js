@@ -1,8 +1,8 @@
 const urlInput = document.getElementById('url-input');
 const feedback = document.getElementById('feedback');
+const loader = document.getElementById('loader');
 
-// Initialized the Web Worker
-const worker = new Worker('urlValidator.js');
+let currentCheckId = 0; // Track the current check ID
 
 // Throttling function
 const throttle = (func, limit) => {
@@ -27,10 +27,27 @@ const throttle = (func, limit) => {
 };
 
 // Mock server check
-const mockServerCheck = throttle(() => {
-    console.log('Mock server check for:', urlInput.value);
+const mockServerCheck = (url) => {
+    console.log('Mock server check for:', url);
+    feedback.textContent = '';
+    loader.style.display = 'block';
+    const checkId = ++currentCheckId; // Increment and store the current check ID
+
+    // Simulate server response
     setTimeout(() => {
-        if (urlInput.value.endsWith('/')) {
+
+        // If the check ID doesn't match, ignore the result
+        if (checkId !== currentCheckId)
+            return;
+
+        loader.style.display = 'none';
+
+        const randomNonExistent = Math.random() < 0.3; // 30% chance that resource doesn't exist
+
+        if (randomNonExistent) {
+            feedback.textContent = 'Resource does not exist (404)';
+            feedback.style.color = 'red';
+        } else if (url.endsWith('/')) {
             feedback.textContent = 'Folder exists';
             feedback.style.color = '#009e8c';
         } else {
@@ -38,24 +55,31 @@ const mockServerCheck = throttle(() => {
             feedback.style.color = '#009e8c';
         }
     }, 1000);
-}, 1000);
+};
 
-// Handle the worker's response (URL validation result)
-worker.onmessage = function (e) {
-    const isValid = e.data;
+const validateUrl = (url) => {
+    const pattern = /^(https?|ftp):\/\/(([a-z\d]([a-z\d-]*[a-z\d])?\.)+[a-z]{2,}|localhost)(\/[-a-z\d%_.~+]*)*(\?[;&a-z\d%_.~+=-]*)?(\#[-a-z\d_]*)?$/i;
+    return pattern.test(url);
+};
 
-    if (isValid) {
+urlInput.addEventListener('input', () => {
+    const url = urlInput.value;
+
+    if (url === '') {
+        feedback.textContent = '';
+        loader.style.display = 'none';
+        currentCheckId++; // Increment ID to prevent future valid checks from overriding
+        return;
+    }
+
+    if (validateUrl(url)) {
         feedback.textContent = 'Valid URL';
         feedback.style.color = '#009e8c';
-        mockServerCheck();
+        mockServerCheck(url);
     } else {
         feedback.textContent = 'Invalid URL';
         feedback.style.color = 'red';
+        loader.style.display = 'none'; // Hide loader immediately
+        currentCheckId++; // Increment ID to prevent future valid checks from overriding
     }
-};
-
-// Listens for input changes and sends URL to the Web Worker
-urlInput.addEventListener('input', () => {
-    const url = urlInput.value;
-    worker.postMessage(url); // Sends URL to the Web Worker for validation
 });
